@@ -56,10 +56,10 @@
         </div>
         <div v-else-if="reponse.occupation > 4">PL</div>
       </div>
-      <input v-show="showSubmitButton" type="submit" value="Suivant" class="btn-submit" :disabled="isSubmitDisabled" />
-      <button v-show="showReturnButton" type="button" @click="returnButton" class="btn-return">
-        Retour
-      </button>
+      <button v-show="showReturnButton" type="button" @click="returnButton" class="btn-return">Return to First
+        Set</button>
+      <input v-show="showSubmitButton" type="submit" value="Submit" class="btn-submit" :disabled="isSubmitDisabled">
+
     </form>
   </div>
   <button @click="downloadData" class="btn-data">Download Data</button>
@@ -137,14 +137,7 @@ const returnButton = () => {
 };
 
 const isSubmitDisabled = computed(() => {
-  return (
-    reponse.value.poste === "" ||
-    reponse.value.plaque === "" ||
-    reponse.value.type === "" ||
-    reponse.value.origine === "" ||
-    reponse.value.occupation === ""
-
-  );
+  return reponse.value.poste === '' || reponse.value.plaque === '' || reponse.value.type === '';
 });
 
 const submitSurvey = async () => {
@@ -282,22 +275,11 @@ label {
   width: 100%;
 }
 
-.btn-return {
-  background-color: #898989;
-  color: white;
-  padding: 10px 20px;
-  margin: 10px 0;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  width: 100%;
+.btn-submit:hover {
+  background-color: #45a049;
 }
 
 .btn-return:hover {
-  background-color: #839684;
-}
-
-.btn-submit:hover {
   background-color: #45a049;
 }
 
