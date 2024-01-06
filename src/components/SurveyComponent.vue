@@ -34,23 +34,16 @@
       <div v-else>
         <div v-if="reponse.type <= 4">
 
-           <div class="form-group">
-    <input
-      class="form-control"
-      type="text"
-      v-model="userInput"
-      placeholder="Entrer les premiere lettres de la COMMUNE"
-    />
-    <ul v-if="userInput && filteredCommunes.length" class="commune-dropdown">
-      <li 
-        v-for="(item, index) in filteredCommunes" 
-        :key="index" 
-        @click="selectCommune(item.COMMUNE)"
-      >
-        {{ item.COMMUNE }}
-      </li>
-    </ul>
-  </div>
+          <div class="form-group">
+            <input class="form-control" type="text" v-model="reponse.origine"
+              placeholder="Entrer les premiere lettres de la COMMUNE" />
+            <ul v-if="showDropdown && reponse.origine && filteredCommunes.length" class="commune-dropdown">
+              <li v-for="(item, index) in filteredCommunes" :key="`${item['CODE INSEE']}-${index}`"
+                @click="selectCommune(item.COMMUNE, item.DEPARTEMENT)">
+                {{ item.COMMUNE }} - {{ item.DEPARTEMENT }}
+              </li>
+            </ul>
+          </div>
 
           <div class="form-group">
             <label for="type">Nombre d'occupants:</label>
@@ -63,10 +56,10 @@
         </div>
         <div v-else-if="reponse.occupation > 4">PL</div>
       </div>
+      <input v-show="showSubmitButton" type="submit" value="Suivant" class="btn-submit" :disabled="isSubmitDisabled" />
       <button v-show="showReturnButton" type="button" @click="returnButton" class="btn-return">
-        Return to First Set
+        Retour
       </button>
-      <input v-show="showSubmitButton" type="submit" value="Submit" class="btn-submit" :disabled="isSubmitDisabled" />
     </form>
   </div>
   <button @click="downloadData" class="btn-data">Download Data</button>
@@ -80,7 +73,6 @@ import { db } from "../firebaseConfig";
 import * as XLSX from "xlsx";
 import { collection, addDoc, getDocs } from "firebase/firestore";
 
-const userInput = ref("");
 const data = ref(insee);
 
 const surveyCollectionRef = collection(db, "Caen");
@@ -97,6 +89,18 @@ const reponse = ref({
 const showSecondSet = ref(false);
 const showSubmitButton = ref(false);
 const showReturnButton = ref(false);
+
+const showDropdown = ref(true);
+
+const selectCommune = (commune1, commune2) => {
+  reponse.value.origine = commune1 + ' - ' + commune2;
+  showDropdown.value = false; // Hide the dropdown
+};
+
+// To show the dropdown again when the user types
+watch(() => reponse.value.origine, (newValue) => {
+  showDropdown.value = Boolean(newValue);
+});
 
 watch(
   () => [
@@ -118,15 +122,14 @@ watch(
   }
 );
 
+
 const filteredCommunes = computed(() => {
   return data.value.filter(item =>
-    item.COMMUNE.toLowerCase().includes(userInput.value.toLowerCase())
+    item.COMMUNE.toLowerCase().includes(reponse.value.origine.toLowerCase())
   );
 });
 
-const selectCommune = (commune) => {
-  userInput.value = commune;
-};
+
 
 
 const returnButton = () => {
@@ -137,7 +140,10 @@ const isSubmitDisabled = computed(() => {
   return (
     reponse.value.poste === "" ||
     reponse.value.plaque === "" ||
-    reponse.value.type === ""
+    reponse.value.type === "" ||
+    reponse.value.origine === "" ||
+    reponse.value.occupation === ""
+
   );
 });
 
@@ -165,16 +171,16 @@ const downloadData = async () => {
     const querySnapshot = await getDocs(surveyCollectionRef);
     let data = [];
     let maxWidths = {}; // Object to keep track of maximum width for each column
-    const minWidth = 21; // Minimum width in Excel units, approximately 3 cm
+    const minWidth = 1; // Minimum width in Excel units, approximately 3 cm
 
     querySnapshot.forEach((doc) => {
       let docData = doc.data();
       let mappedData = {
-        Poste: docData.q1 || "",
-        Date: docData.q2 || "",
-        Numero_Enquete: doc.id, // Firebase document ID
-        Numero_questionnaire: docData.q4 || "",
-        heure: docData.q5 || "",
+        q1: docData.q1 || "",
+        q2: docData.q2 || "",
+        q3: doc.id, // Firebase document ID
+        q4: docData.q4 || "",
+        q5: docData.q5 || "",
         q6: docData.q6 || "",
         q7: docData.q7 || "",
         q8: docData.q8 || "",
@@ -183,28 +189,32 @@ const downloadData = async () => {
       data.push(mappedData);
     });
 
-    // Sort data by 'Numero_Enquete' (Firebase document ID)
-    data.sort(
-      (a, b) => Number(a.Numero_questionnaire) - Number(b.Numero_questionnaire)
-    );
+      data.sort((a, b) => {
+      // Assuming q4 is a number. If it's a string or a different type, you might need to modify this comparison
+      return a.q4 - b.q4;
+    });
 
     // Calculate the maximum width for each column, considering the minimum width
+    const scalingFactor = 1.1; // Adjust this factor as needed for padding or wider characters
+
     Object.keys(data[0]).forEach((key) => {
       let maxLen = Math.max(
         ...data.map((item) => item[key].toString().length),
         minWidth
       );
-      maxWidths[key] = maxLen;
+
+      maxWidths[key] = Math.ceil(maxLen * scalingFactor); // Apply scaling factor and round up
     });
+
 
     // Convert data to a worksheet
     const worksheet = XLSX.utils.json_to_sheet(data, {
       header: [
-        "Poste",
-        "Date",
-        "Numero_Enquete",
-        "Numero_questionnaire",
-        "heure",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        "q5",
         "q6",
         "q7",
         "q8",
@@ -259,6 +269,7 @@ label {
   border: 1px solid #333;
   background-color: #333;
   color: white;
+  text-transform: uppercase;
 }
 
 .btn-submit {
@@ -269,6 +280,21 @@ label {
   border-radius: 5px;
   cursor: pointer;
   width: 100%;
+}
+
+.btn-return {
+  background-color: #898989;
+  color: white;
+  padding: 10px 20px;
+  margin: 10px 0;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.btn-return:hover {
+  background-color: #839684;
 }
 
 .btn-submit:hover {
